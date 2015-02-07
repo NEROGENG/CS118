@@ -75,11 +75,15 @@ private:
   void
   recvTrackerResponse();
 
+  const std::string 
+  getMyIP();
+
 private:
   MetaInfo m_metaInfo;
   std::string m_trackerHost;
   std::string m_trackerPort;
   std::string m_trackerFile;
+  std::string m_myIP;
 
   uint16_t m_clientPort;
 

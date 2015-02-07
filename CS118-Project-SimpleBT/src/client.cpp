@@ -39,6 +39,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <time.h>
+#include <ifaddrs.h>
 
 
 
@@ -52,6 +53,8 @@ Client::Client(const std::string& port, const std::string& torrent)
   srand(time(NULL));
 
   m_clientPort = boost::lexical_cast<uint16_t>(port);
+
+  m_myIP = getMyIP();
 
   loadMetaInfo(torrent);
 
@@ -146,8 +149,8 @@ Client::sendTrackerRequest()
   TrackerRequestParam param;
 
   param.setInfoHash(m_metaInfo.getHash());
-  param.setPeerId("01234567890123456789"); //TODO:
-  param.setIp("127.0.0.1"); //TODO:
+  param.setPeerId("SIMPLEBT-TEST-PEERID"); //TODO:
+  param.setIp(m_myIP); //TODO:
   param.setPort(m_clientPort); //TODO:
   param.setUploaded(100); //TODO:
   param.setDownloaded(200); //TODO:
@@ -158,6 +161,8 @@ Client::sendTrackerRequest()
   // std::string path = m_trackerFile;
   std::string path = m_metaInfo.getAnnounce();
   path += param.encode();
+
+  param.print(std::cout);
 
   HttpRequest request;
   request.setMethod(HttpRequest::GET);
@@ -259,6 +264,27 @@ Client::recvTrackerResponse()
   }
 
   m_isFirstRes = false;
+}
+
+const std::string
+Client::getMyIP() {
+  struct ifaddrs *ifap, *ifa;
+  struct sockaddr_in *sa;
+  char *addr;
+  std::string s;
+
+  getifaddrs (&ifap);
+  for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+      if (ifa->ifa_addr->sa_family == AF_INET && !strcmp(ifa->ifa_name, "eth0")) {
+          sa = (struct sockaddr_in *) ifa->ifa_addr;
+          addr = inet_ntoa(sa->sin_addr);
+          s = addr;
+      }
+  }
+
+  freeifaddrs(ifap);
+
+  return s;
 }
 
 } // namespace sbt
