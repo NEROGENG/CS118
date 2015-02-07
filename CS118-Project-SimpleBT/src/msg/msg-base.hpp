@@ -354,7 +354,7 @@ public:
   }
 
   void
-  setBlock(ConstBufferPtr block)
+  setBitfield(ConstBufferPtr block)
   {
     m_block = block;
   }
