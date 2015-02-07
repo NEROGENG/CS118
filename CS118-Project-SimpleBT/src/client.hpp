@@ -24,6 +24,7 @@
 
 #include "common.hpp"
 #include "meta-info.hpp"
+#include <vector>
 
 namespace sbt {
 
@@ -66,6 +67,9 @@ private:
   void
   loadMetaInfo(const std::string& torrent);
 
+  bool
+  checkFile(const std::string& filename);
+
   void
   connectTracker();
 
@@ -74,6 +78,9 @@ private:
 
   void
   recvTrackerResponse();
+
+  bool
+  validatePiece(const std::string& text, const std::string& hash);
 
   const std::string 
   getMyIP();
@@ -95,6 +102,9 @@ private:
   uint64_t m_interval;
   bool m_isFirstReq;
   bool m_isFirstRes;
+
+  int m_numPieces;
+  std::vector<uint8_t> m_bitfield;
 };
 
 } // namespace sbt

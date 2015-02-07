@@ -24,6 +24,7 @@
 #include "tracker-response.hpp"
 #include "http/http-request.hpp"
 #include "http/http-response.hpp"
+#include "util/hash.hpp"
 #include <fstream>
 #include <boost/tokenizer.hpp>
 #include <boost/lexical_cast.hpp>
@@ -40,6 +41,8 @@
 #include <unistd.h>
 #include <time.h>
 #include <ifaddrs.h>
+#include <vector>
+#include <cmath>
 
 
 
@@ -57,6 +60,15 @@ Client::Client(const std::string& port, const std::string& torrent)
   m_myIP = getMyIP();
 
   loadMetaInfo(torrent);
+
+  m_numPieces = ceil((double)m_metaInfo.getLength()/(double)m_metaInfo.getPieceLength());
+
+  // std::cout << "Number of Pieces: " << m_numPieces << std::endl;
+
+  if (checkFile(m_metaInfo.getName()))
+    std::cout << m_metaInfo.getName() << " exists!" << std::endl;
+  else
+    std::cout << m_metaInfo.getName() << " does not exist!" << std::endl;
 
   run();
 }
@@ -113,6 +125,50 @@ Client::loadMetaInfo(const std::string& torrent)
   }
 }
 
+bool
+Client::checkFile(const std::string& filename) {
+  std::fstream f(filename, std::fstream::in | std::fstream::out | std::fstream::ate);
+
+  if (!f.good()) {
+    f.close();
+    return false;
+  }
+  else if (f.tellg() != m_metaInfo.getLength()) {
+    std::cout<< f.tellg() << " against " << m_metaInfo.getLength() << std::endl;
+    f.seekp(m_metaInfo.getLength() - 1);
+    f.write("", 1);
+    std::cout<< f.tellg() << " against " << m_metaInfo.getLength() << std::endl;
+  }
+
+  f.seekg(0, f.beg);
+  std::vector<uint8_t> bitfield(ceil(m_numPieces/8.0), '\0');
+  // std::cout << bitfield.size() << " bytes" << std::endl;
+
+  std::vector<uint8_t> v = m_metaInfo.getPieces();
+  int pieceLength = m_metaInfo.getPieceLength();
+
+  for (int i = 0; i < m_numPieces; i++) {
+    std::string temp = std::string(v.begin() + i * 20, v.begin() + (i + 1) * 20);
+    // std::cout << temp << "@  " << i << "  @" << std::endl;
+    f.seekg(i * pieceLength, f.beg);
+    char* buf = new char[pieceLength + 1];
+    memset(buf, '\0', pieceLength + 1);
+    f.readsome(buf, pieceLength);
+
+    if (validatePiece(std::string(buf), temp))
+      bitfield[i / 8] |= 1 << (i % 8);
+
+    delete buf;
+    // std::cout << util::sha1(std::string(buf)) << "@  " << i << "  @" << std::endl;
+  }
+  
+  m_bitfield = bitfield;
+  std::cout << (int)m_bitfield[0] << (int)m_bitfield[1] << (int)m_bitfield[2] << std::endl;
+
+  f.close();
+  return true;
+}
+
 void
 Client::connectTracker()
 {
@@ -149,20 +205,22 @@ Client::sendTrackerRequest()
   TrackerRequestParam param;
 
   param.setInfoHash(m_metaInfo.getHash());
-  param.setPeerId("SIMPLEBT-TEST-PEERID"); //TODO:
-  param.setIp(m_myIP); //TODO:
-  param.setPort(m_clientPort); //TODO:
+  param.setPeerId("SIMPLEBT-TEST-PEERID");
+  param.setIp(m_myIP);
+  param.setPort(m_clientPort);
   param.setUploaded(100); //TODO:
   param.setDownloaded(200); //TODO:
   param.setLeft(300); //TODO:
   if (m_isFirstReq)
     param.setEvent(TrackerRequestParam::STARTED);
+  if (param.getLeft() == 0)
+    param.setEvent(TrackerRequestParam::COMPLETED);
 
   // std::string path = m_trackerFile;
   std::string path = m_metaInfo.getAnnounce();
   path += param.encode();
 
-  param.print(std::cout);
+  // param.print(std::cout);
 
   HttpRequest request;
   request.setMethod(HttpRequest::GET);
@@ -264,6 +322,11 @@ Client::recvTrackerResponse()
   }
 
   m_isFirstRes = false;
+}
+
+bool
+Client::validatePiece(const std::string& text, const std::string& hash) {
+  return util::sha1(text) == hash;
 }
 
 const std::string
