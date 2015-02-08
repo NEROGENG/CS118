@@ -71,6 +71,9 @@ private:
   checkFile(const std::string& filename);
 
   void
+  checkFileOrCreate();
+
+  void
   connectTracker();
 
   void
@@ -81,6 +84,12 @@ private:
 
   bool
   validatePiece(const std::string& text, const std::string& hash);
+
+  bool
+  hasPiece(std::vector<uint8_t> bitfield, int pieceIndex);
+
+  void
+  writePieceToDisk(const char* buffer, int pieceIndex, int pieceLength);
 
   const std::string 
   getMyIP();

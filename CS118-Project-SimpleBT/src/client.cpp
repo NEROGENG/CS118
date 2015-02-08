@@ -25,6 +25,7 @@
 #include "http/http-request.hpp"
 #include "http/http-response.hpp"
 #include "util/hash.hpp"
+#include "util/buffer.hpp"
 #include <fstream>
 #include <boost/tokenizer.hpp>
 #include <boost/lexical_cast.hpp>
@@ -62,13 +63,9 @@ Client::Client(const std::string& port, const std::string& torrent)
   loadMetaInfo(torrent);
 
   m_numPieces = ceil((double)m_metaInfo.getLength()/(double)m_metaInfo.getPieceLength());
-
   // std::cout << "Number of Pieces: " << m_numPieces << std::endl;
 
-  if (checkFile(m_metaInfo.getName()))
-    std::cout << m_metaInfo.getName() << " exists!" << std::endl;
-  else
-    std::cout << m_metaInfo.getName() << " does not exist!" << std::endl;
+  checkFileOrCreate();
 
   run();
 }
@@ -84,6 +81,30 @@ Client::run()
     close(m_trackerSock);
     sleep(m_interval);
   }
+}
+
+void
+Client::checkFileOrCreate() { 
+  if (checkFile(m_metaInfo.getName()))
+    std::cout << m_metaInfo.getName() << " exists!" << std::endl;
+  else {
+    std::cout << m_metaInfo.getName() << " does not exist! Let's create one!" << std::endl;
+
+    std::ofstream ofs(m_metaInfo.getName(), std::ios::binary | std::ios::out);
+    ofs.seekp(m_metaInfo.getLength() - 1);
+    ofs.write("", 1);
+    std::vector<uint8_t> v(ceil(m_numPieces/8.0), '\0');
+    m_bitfield = v;
+  }
+
+  // char array [3] = {'x', 'y', 'z'};
+  // writePieceToDisk(array, 0, 3);
+
+  ConstBufferPtr CBP(new const Buffer(m_bitfield.begin(), m_bitfield.end()));
+
+  std::cout << "Bitfield: ";
+  CBP->print(std::cout);
+  std::cout << std::endl;
 }
 
 void
@@ -129,11 +150,11 @@ bool
 Client::checkFile(const std::string& filename) {
   std::fstream f(filename, std::fstream::in | std::fstream::out | std::fstream::ate);
 
-  if (!f.good()) {
+  if (!f.good() || f.tellg() > m_metaInfo.getLength()) {
     f.close();
     return false;
   }
-  else if (f.tellg() != m_metaInfo.getLength()) {
+  else if (f.tellg() < m_metaInfo.getLength()) {
     std::cout<< f.tellg() << " against " << m_metaInfo.getLength() << std::endl;
     f.seekp(m_metaInfo.getLength() - 1);
     f.write("", 1);
@@ -163,7 +184,7 @@ Client::checkFile(const std::string& filename) {
   }
   
   m_bitfield = bitfield;
-  std::cout << (int)m_bitfield[0] << (int)m_bitfield[1] << (int)m_bitfield[2] << std::endl;
+  // std::cout << (int)m_bitfield[0] << (int)m_bitfield[1] << (int)m_bitfield[2] << std::endl;
 
   f.close();
   return true;
@@ -327,6 +348,21 @@ Client::recvTrackerResponse()
 bool
 Client::validatePiece(const std::string& text, const std::string& hash) {
   return util::sha1(text) == hash;
+}
+
+bool
+Client::hasPiece(std::vector<uint8_t> bitfield, int pieceIndex) {
+  return bitfield[pieceIndex / 8] & (1 << pieceIndex % 8);
+}
+
+void
+Client::writePieceToDisk(const char* buffer, int pieceIndex, int pieceLength) {
+  std::fstream f(m_metaInfo.getName(), std::fstream::in | std::fstream::out);
+  f.seekp(pieceIndex * pieceLength, f.beg);
+  f.write(buffer, pieceLength);
+  m_bitfield[pieceIndex / 8] |= 1 << (pieceIndex % 8);
+
+  f.close();
 }
 
 const std::string
