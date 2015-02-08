@@ -75,7 +75,6 @@ Client::Client(const std::string& port, const std::string& torrent)
 
   int lastPieceLength = m_metaInfo.getLength() - m_metaInfo.getPieceLength() * (m_numPieces - 1);
   readPieceToBuffer(array, 22, lastPieceLength);
-  array[lastPieceLength] = '\0';
   writePieceToDisk(array, 22, lastPieceLength);
 
   run();
