@@ -91,6 +91,9 @@ private:
   void
   writePieceToDisk(const char* buffer, int pieceIndex, int pieceLength);
 
+  void
+  readPieceToBuffer(char* buffer, int pieceIndex, int pieceLength);
+
   const std::string 
   getMyIP();
 

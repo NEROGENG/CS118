@@ -67,6 +67,17 @@ Client::Client(const std::string& port, const std::string& torrent)
 
   checkFileOrCreate();
 
+  char array[2048];
+  for (int i = 0; i < 22; i++) {
+    readPieceToBuffer(array, i, 2048);
+    writePieceToDisk(array, i, 2048);
+  }
+
+  int lastPieceLength = m_metaInfo.getLength() - m_metaInfo.getPieceLength() * (m_numPieces - 1);
+  readPieceToBuffer(array, 22, lastPieceLength);
+  array[lastPieceLength] = '\0';
+  writePieceToDisk(array, 22, lastPieceLength);
+
   run();
 }
 
@@ -358,9 +369,18 @@ Client::hasPiece(std::vector<uint8_t> bitfield, int pieceIndex) {
 void
 Client::writePieceToDisk(const char* buffer, int pieceIndex, int pieceLength) {
   std::fstream f(m_metaInfo.getName(), std::fstream::in | std::fstream::out);
-  f.seekp(pieceIndex * pieceLength, f.beg);
+  f.seekp(pieceIndex * m_metaInfo.getPieceLength(), f.beg);
   f.write(buffer, pieceLength);
   m_bitfield[pieceIndex / 8] |= 1 << (pieceIndex % 8);
+
+  f.close();
+}
+
+void
+Client::readPieceToBuffer(char* buffer, int pieceIndex, int pieceLength) {
+  std::fstream f(m_metaInfo.getName(), std::fstream::in | std::fstream::out);
+  f.seekg(pieceIndex * m_metaInfo.getPieceLength(), f.beg);
+  f.readsome(buffer, pieceLength);
 
   f.close();
 }
