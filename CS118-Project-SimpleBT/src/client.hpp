@@ -24,7 +24,10 @@
 
 #include "common.hpp"
 #include "meta-info.hpp"
+#include "tracker-response.hpp"
+#include "tracker-request-param.hpp"
 #include <vector>
+#include <set>
 #include <map>
 
 namespace sbt {
@@ -92,6 +95,9 @@ private:
   bool
   hasPiece(std::vector<uint8_t> bitfield, int pieceIndex);
 
+  bool
+  requestPiece(int pieceIndex);
+
   void
   writePieceToDisk(const char* buffer, int pieceIndex, int pieceLength);
 
@@ -121,15 +127,18 @@ private:
   uint64_t m_interval;
   bool m_isFirstReq;
   bool m_isFirstRes;
+  bool m_isComplete;
 
   int m_numPieces;
   std::vector<uint8_t> m_bitfield;
   std::vector<PeerInfo> m_peerlist;
   std::map<std::string, int> m_connectionlist;
+  std::set<int> m_requested;
 
   uint64_t m_uploaded;
   uint64_t m_downloaded;
   uint64_t m_left;
+
 };
 
 } // namespace sbt

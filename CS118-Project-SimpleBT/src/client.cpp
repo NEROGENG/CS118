@@ -45,6 +45,7 @@
 #include <ifaddrs.h>
 #include <vector>
 #include <map>
+#include <set>
 #include <cmath>
 
 
@@ -115,11 +116,13 @@ Client::checkFileOrCreate() {
     if (hasPiece(m_bitfield, i))
       m_left += m_metaInfo.getPieceLength();
   }
-  if (hasPiece(m_bitfield, m_numPieces - 1)
+  if (hasPiece(m_bitfield, m_numPieces - 1))
     m_left += m_metaInfo.getLength() - m_metaInfo.getPieceLength() * (m_numPieces - 1);
   m_left = m_metaInfo.getLength() - m_left;
 
-  std::cout << "Left: " << m_left << endl;
+  m_isComplete = false;
+
+  std::cout << "Left: " << m_left << std::endl;
 
   // char array [3] = {'x', 'y', 'z'};
   // writePieceToDisk(array, 0, 3);
@@ -258,7 +261,7 @@ Client::sendTrackerRequest()
   param.setLeft(m_left); //TODO:
   if (m_isFirstReq)
     param.setEvent(TrackerRequestParam::STARTED);
-  if (param.getLeft() == 0)
+  if (m_isComplete)
     param.setEvent(TrackerRequestParam::COMPLETED);
 
   // std::string path = m_trackerFile;
@@ -374,7 +377,7 @@ Client::broadcastHaveMsg(int pieceIndex) {
   for(std::map<std::string, int>::iterator it = m_connectionlist.begin(); it != m_connectionlist.end(); it++) {
     msg::Have hv(pieceIndex);
     ConstBufferPtr hvcontent = hv.encode();
-    send(iterator->second, hvcontent.buf(), hvcontent.size(), 0);
+    send(it->second, hvcontent->buf(), hvcontent->size(), 0);
   }
 }
 
@@ -386,6 +389,13 @@ Client::validatePiece(const std::string& text, const std::string& hash) {
 bool
 Client::hasPiece(std::vector<uint8_t> bitfield, int pieceIndex) {
   return bitfield[pieceIndex / 8] & (1 << pieceIndex % 8);
+}
+
+bool
+Client::requestPiece(int pieceIndex) {
+  std::pair<std::set<int>::iterator,bool> ret;
+  ret = m_requested.insert(pieceIndex);
+  return ret.second;
 }
 
 void
@@ -411,7 +421,12 @@ void
 Client::updateTrackerRequest(int up, int down) {
   m_uploaded += up;
   m_downloaded += down;
-  m_left -= down;
+  m_isComplete = false;
+  if (m_left > 0) {
+    m_left -= down;
+    if (m_left == 0)
+      m_isComplete = true;
+  }
 }
 
 const std::string
