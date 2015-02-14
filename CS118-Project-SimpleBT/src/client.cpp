@@ -81,7 +81,7 @@ Client::Client(const std::string& port, const std::string& torrent)
   // int lastPieceLength = m_metaInfo.getLength() - m_metaInfo.getPieceLength() * (m_numPieces - 1);
   // readPieceToBuffer(array, 22, lastPieceLength);
   // writePieceToDisk(array, 22, lastPieceLength);
-  
+
   // std::vector<uint8_t> v(m_bitfield);
   // v.push_back('\0');
   // initializePeerBitfield("aaa", v);
@@ -408,10 +408,22 @@ Client::hasPiece(std::vector<uint8_t> bitfield, int pieceIndex) {
 }
 
 bool
-Client::requestPiece(int pieceIndex) {
-  std::pair<std::set<int>::iterator,bool> ret;
-  ret = m_requested.insert(pieceIndex);
-  return ret.second;
+Client::requestPiece(std::string peerid, int pieceIndex) {
+  if (m_requested.find(pieceIndex) == m_requested.end()) {
+    m_requested.insert(std::pair<int, std::string> (pieceIndex, peerid));
+    return true;
+  }
+  return false;
+}
+
+void
+Client::resetRequestPiece(std::string peerid) {
+  for(std::map<int, std::string>::iterator it = m_requested.begin(); it != m_requested.end();) {
+    if (it->second == peerid)
+      m_requested.erase(it++);
+    else
+      it++;
+  }
 }
 
 void
