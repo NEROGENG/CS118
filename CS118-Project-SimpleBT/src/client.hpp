@@ -26,6 +26,7 @@
 #include "meta-info.hpp"
 #include "tracker-response.hpp"
 #include "tracker-request-param.hpp"
+#include "util/buffer.hpp"
 #include <vector>
 #include <set>
 #include <map>
@@ -105,6 +106,12 @@ private:
   readPieceToBuffer(char* buffer, int pieceIndex, int pieceLength);
 
   void
+  initializePeerBitfield(std::string peerid, std::vector<uint8_t> bitfield);
+
+  void
+  updatePeerBitfield(std::string peerid, int pieceIndex);
+
+  void
   updateTrackerRequest(int up, int down);
 
   const std::string 
@@ -133,6 +140,7 @@ private:
   std::vector<uint8_t> m_bitfield;
   std::vector<PeerInfo> m_peerlist;
   std::map<std::string, int> m_connectionlist;
+  std::map<std::string, std::vector<uint8_t> > m_peerbitfields;
   std::set<int> m_requested;
 
   uint64_t m_uploaded;

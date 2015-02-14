@@ -81,6 +81,22 @@ Client::Client(const std::string& port, const std::string& torrent)
   // int lastPieceLength = m_metaInfo.getLength() - m_metaInfo.getPieceLength() * (m_numPieces - 1);
   // readPieceToBuffer(array, 22, lastPieceLength);
   // writePieceToDisk(array, 22, lastPieceLength);
+  
+  // std::vector<uint8_t> v(m_bitfield);
+  // v.push_back('\0');
+  // initializePeerBitfield("aaa", v);
+  // initializePeerBitfield("bbb", m_bitfield);
+  // ConstBufferPtr CBP1(new const Buffer(m_peerbitfields["aaa"].begin(), m_peerbitfields["aaa"].end()));
+
+  // std::cout << "m_peerbitfields['aaa'] is ";
+  // CBP1->print(std::cout);
+  // std::cout << std::endl;
+
+  // ConstBufferPtr CBP2(new const Buffer(m_peerbitfields["bbb"].begin(), m_peerbitfields["bbb"].end()));
+
+  // std::cout << "m_peerbitfields['bbb'] is ";
+  // CBP2->print(std::cout);
+  // std::cout << std::endl;
 
   run();
 }
@@ -415,6 +431,17 @@ Client::readPieceToBuffer(char* buffer, int pieceIndex, int pieceLength) {
   f.readsome(buffer, pieceLength);
 
   f.close();
+}
+
+void
+Client::initializePeerBitfield(std::string peerid, std::vector<uint8_t> bitfield) {
+  bitfield.resize(m_bitfield.size(), '\0');
+  m_peerbitfields.insert(std::pair<std::string, std::vector<uint8_t> >(peerid, bitfield));
+}
+
+void
+Client::updatePeerBitfield(std::string peerid, int pieceIndex) {
+  m_peerbitfields[peerid][pieceIndex / 8] |= 1 << (pieceIndex % 8);
 }
 
 void
