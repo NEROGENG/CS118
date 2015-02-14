@@ -25,6 +25,7 @@
 #include "common.hpp"
 #include "meta-info.hpp"
 #include <vector>
+#include <map>
 
 namespace sbt {
 
@@ -82,6 +83,9 @@ private:
   void
   recvTrackerResponse();
 
+  void
+  broadcastHaveMsg(int pieceIndex);
+
   bool
   validatePiece(const std::string& text, const std::string& hash);
 
@@ -93,6 +97,9 @@ private:
 
   void
   readPieceToBuffer(char* buffer, int pieceIndex, int pieceLength);
+
+  void
+  updateTrackerRequest(int up, int down);
 
   const std::string 
   getMyIP();
@@ -117,6 +124,12 @@ private:
 
   int m_numPieces;
   std::vector<uint8_t> m_bitfield;
+  std::vector<PeerInfo> m_peerlist;
+  std::map<std::string, int> m_connectionlist;
+
+  uint64_t m_uploaded;
+  uint64_t m_downloaded;
+  uint64_t m_left;
 };
 
 } // namespace sbt

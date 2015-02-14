@@ -26,6 +26,7 @@
 #include "http/http-response.hpp"
 #include "util/hash.hpp"
 #include "util/buffer.hpp"
+#include "msg/msg-base.hpp"
 #include <fstream>
 #include <boost/tokenizer.hpp>
 #include <boost/lexical_cast.hpp>
@@ -43,6 +44,7 @@
 #include <time.h>
 #include <ifaddrs.h>
 #include <vector>
+#include <map>
 #include <cmath>
 
 
@@ -59,6 +61,9 @@ Client::Client(const std::string& port, const std::string& torrent)
   m_clientPort = boost::lexical_cast<uint16_t>(port);
 
   m_myIP = getMyIP();
+  m_uploaded = 0;
+  m_downloaded = 0;
+  m_left = 0;
 
   loadMetaInfo(torrent);
 
@@ -67,15 +72,14 @@ Client::Client(const std::string& port, const std::string& torrent)
 
   checkFileOrCreate();
 
-  char array[2048];
-  for (int i = 0; i < 22; i++) {
-    readPieceToBuffer(array, i, 2048);
-    writePieceToDisk(array, i, 2048);
-  }
-
-  int lastPieceLength = m_metaInfo.getLength() - m_metaInfo.getPieceLength() * (m_numPieces - 1);
-  readPieceToBuffer(array, 22, lastPieceLength);
-  writePieceToDisk(array, 22, lastPieceLength);
+  // char array[2048];
+  // for (int i = 0; i < 22; i++) {
+  //   readPieceToBuffer(array, i, 2048);
+  //   writePieceToDisk(array, i, 2048);
+  // }
+  // int lastPieceLength = m_metaInfo.getLength() - m_metaInfo.getPieceLength() * (m_numPieces - 1);
+  // readPieceToBuffer(array, 22, lastPieceLength);
+  // writePieceToDisk(array, 22, lastPieceLength);
 
   run();
 }
@@ -106,6 +110,16 @@ Client::checkFileOrCreate() {
     std::vector<uint8_t> v(ceil(m_numPieces/8.0), '\0');
     m_bitfield = v;
   }
+
+  for (int i = 0; i < m_numPieces - 1; i++) {
+    if (hasPiece(m_bitfield, i))
+      m_left += m_metaInfo.getPieceLength();
+  }
+  if (hasPiece(m_bitfield, m_numPieces - 1)
+    m_left += m_metaInfo.getLength() - m_metaInfo.getPieceLength() * (m_numPieces - 1);
+  m_left = m_metaInfo.getLength() - m_left;
+
+  std::cout << "Left: " << m_left << endl;
 
   // char array [3] = {'x', 'y', 'z'};
   // writePieceToDisk(array, 0, 3);
@@ -236,12 +250,12 @@ Client::sendTrackerRequest()
   TrackerRequestParam param;
 
   param.setInfoHash(m_metaInfo.getHash());
-  param.setPeerId("SIMPLEBT-TEST-PEERID");
+  param.setPeerId("SIMPLEBT.TEST.PEERID");
   param.setIp(m_myIP);
   param.setPort(m_clientPort);
-  param.setUploaded(100); //TODO:
-  param.setDownloaded(200); //TODO:
-  param.setLeft(300); //TODO:
+  param.setUploaded(m_uploaded); //TODO:
+  param.setDownloaded(m_downloaded); //TODO:
+  param.setLeft(m_left); //TODO:
   if (m_isFirstReq)
     param.setEvent(TrackerRequestParam::STARTED);
   if (param.getLeft() == 0)
@@ -355,6 +369,15 @@ Client::recvTrackerResponse()
   m_isFirstRes = false;
 }
 
+void
+Client::broadcastHaveMsg(int pieceIndex) {
+  for(std::map<std::string, int>::iterator it = m_connectionlist.begin(); it != m_connectionlist.end(); it++) {
+    msg::Have hv(pieceIndex);
+    ConstBufferPtr hvcontent = hv.encode();
+    send(iterator->second, hvcontent.buf(), hvcontent.size(), 0);
+  }
+}
+
 bool
 Client::validatePiece(const std::string& text, const std::string& hash) {
   return util::sha1(text) == hash;
@@ -382,6 +405,13 @@ Client::readPieceToBuffer(char* buffer, int pieceIndex, int pieceLength) {
   f.readsome(buffer, pieceLength);
 
   f.close();
+}
+
+void
+Client::updateTrackerRequest(int up, int down) {
+  m_uploaded += up;
+  m_downloaded += down;
+  m_left -= down;
 }
 
 const std::string
