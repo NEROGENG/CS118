@@ -141,16 +141,18 @@ private:
   std::vector<uint8_t> m_bitfield;
   std::vector<PeerInfo> m_peerlist;
   std::map<std::string, int> m_connectionlist;
-  std::map<int, std::string> m_inverseList;
-  std::vector<std::pair<int, int>> m_fdToPieceNum;
   std::vector<int> m_listen_list;
   std::map<std::string, std::vector<uint8_t> > m_peerbitfields;
   std::set<int> m_requested;
-  std::map<int, bool> m_unchoke;
+  std::map<int, std::string> m_inverseList;
+  std::vector<std::pair<int, int>> m_fdToPieceNum;
+
   std::map<int, std::vector<size_t>> m_pieceNeed;
 
-  int m_uploaded;
+  std::map<int, bool> m_unchoke;
+
   int m_downloaded;
+  int m_uploaded;
   int m_left;
 
   bool good_response;

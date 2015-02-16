@@ -104,10 +104,6 @@ Client::checkFileOrCreate()
   m_left = m_metaInfo.getLength() - m_left;
 
   m_isComplete = false;
-
-  // char array [3] = {'x', 'y', 'z'};
-  // writePieceToDisk(array, 0, 3);
-
  
 }
  
@@ -249,6 +245,7 @@ Client::run()
   connectTracker();
   sendTrackerRequest();
   FD_SET(m_trackerSock, &readFds);
+  tmpFds = readFds;
   m_isFirstReq = false;
   if (maxSockfd < m_trackerSock)
         maxSockfd = m_trackerSock;
@@ -277,11 +274,6 @@ Client::run()
     tv.tv_sec  = new_tv.tv_sec - old_tv.tv_sec;
     tv.tv_sec  = m_interval - tv.tv_sec;
 
-    //std::cout << tv.tv_sec << std::endl;
-
-    //readFds = tmpFds;
-    // set up watcher
-
     int rtrn = select(maxSockfd + 1, &readFds, NULL, NULL, &tv);
 
     if (rtrn == -1) 
@@ -295,6 +287,7 @@ Client::run()
 
         connectTracker();
         sendTrackerRequest();
+        readFds = tmpFds;
         FD_SET(m_trackerSock, &readFds);
         if (maxSockfd < m_trackerSock)
             maxSockfd = m_trackerSock;
@@ -434,6 +427,8 @@ Client::run()
 
                       if (m_connectionlist.find(peer.peerId) == m_connectionlist.end())
                       {
+
+
                           if (connect(peer_socket, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) == -1) 
                           {
                             perror("connect");
@@ -465,10 +460,14 @@ Client::run()
                               return ;
                           }
 
+                          //std::cout << received_handshake.size() << std::endl;
+
+
                           received_handshake.insert(received_handshake.begin()+pos, buf, buf+temp_received);
 
                           pos += temp_received;
                       }
+
 
                       //auto handshake_CBP = std::make_shared<ConstBufferPtr>(received_handshake, received_handshake->size());
               
@@ -488,7 +487,6 @@ Client::run()
 
                       m_connectionlist.insert(std::pair<std::string, int>(peer.peerId, peer_socket));
                       m_inverseList.insert(std::pair<int,    std::string>(peer_socket, peer.peerId));
-
 
                       // ++++++++++++++++++ BITFIELD ++++++++++++++++++++++++
 
@@ -557,7 +555,7 @@ Client::run()
               pos1 += temp_received1;
           }
 
-          int received_length_int = (received_buf[0] << 24) | (received_buf[1] << 16) | (received_buf[2] << 8) | received_buf[3];
+          unsigned received_length_int = (received_buf[0] << 24) | (received_buf[1] << 16) | (received_buf[2] << 8) | received_buf[3];
 
           //std::cout << received_length_int << std::endl;
        
@@ -615,14 +613,14 @@ Client::run()
                   std::vector<size_t> piecesNeeded;
 
 
-                  for (int i = 0; i < otherBitfield.size(); i ++)
+                  for (unsigned i = 0; i < otherBitfield.size(); i ++)
                   {
                     otherBitfield[i] = (otherBitfield[i] * 0x0202020202ULL & 0x010884422010ULL) % 1023;
                   }
                   initializePeerBitfield(m_inverseList[fd],otherBitfield);
 
 
-                  for(size_t i=0;i<m_numPieces;i++)
+                  for(int i=0;i<m_numPieces;i++)
                   {
                     //otherBitfield.resize(m_bitfield.size(), 0);
 
@@ -676,19 +674,16 @@ Client::run()
             case sbt::msg::MsgId::MSG_ID_UNCHOKE:
             {
 
-              
-              for (size_t i=0;i<m_pieceNeed[fd].size();i++)
+
+              for (std::map<int,bool>::iterator it=m_unchoke.begin(); it!=m_unchoke.end(); ++it)
               {
-                if(!requestPiece(m_pieceNeed[fd][i]))
-                  continue;
-
-                //send Request msg
-                sbt::msg::Request rqst(m_pieceNeed[fd][i], 0, m_metaInfo.getPieceLength()); //request the missing piece
-                ConstBufferPtr rqstContent=rqst.encode();
-                send(fd, rqstContent->buf(), rqstContent->size(), 0);
-
+                if (it->second)
+                  it->second = false;
               }
-              
+
+              m_unchoke.insert(std::pair<int,bool>(fd,true));
+
+
             
               break;
             }
@@ -738,7 +733,7 @@ Client::run()
 
               int lastPieceLength = m_metaInfo.getLength() - m_metaInfo.getPieceLength() * (m_numPieces - 1);
 
-              if (pc1.getIndex() == m_numPieces - 1)
+              if ((int)pc1.getIndex() == m_numPieces - 1)
               {
                 text = text.substr(0, lastPieceLength);
               }
@@ -750,25 +745,27 @@ Client::run()
 
 
                 //std::cout << text.length() << std::endl;
-                if (pc1.getIndex() == m_numPieces - 1)
+                if ((int)pc1.getIndex() == m_numPieces - 1)
                    writePieceToDisk((char*)pc1.getBlock()->buf(), (int)pc1.getIndex(), lastPieceLength);
 
                 else
                    writePieceToDisk((char*)pc1.getBlock()->buf(), (int)pc1.getIndex(), (int)m_metaInfo.getPieceLength());
 
                 updateSelfBitfield(pc1.getIndex());
-                updateTrackerRequest(0,(int)m_metaInfo.getPieceLength());
+                updateTrackerRequest(0,text.length());
 
-                std::cout << "download: " << m_downloaded << std::endl;
-                std::cout << "left: " << m_left << std::endl;
-
+                // updateTrackerRequest(0,text.length());
 
                 sbt::msg::Have hv1(pc1.getIndex());
                 ConstBufferPtr hvContent=hv1.encode();
                 broadcastHaveMsg(pc1.getIndex()); //send to all peers
+                updateSelfBitfield((int)pc1.getIndex());
+
+
               }
               else
               {
+
                 sbt::msg::Request rqst(pc1.getIndex(), 0, m_metaInfo.getPieceLength()); //request the missing piece
                 ConstBufferPtr rqstContent=rqst.encode();
                 send(fd, rqstContent->buf(), rqstContent->size(), 0);
@@ -806,6 +803,62 @@ Client::run()
           }
 
         }
+
+        if (!m_unchoke.empty())
+        {
+              for (std::map<int,bool>::iterator it=m_unchoke.begin(); it!=m_unchoke.end(); ++it)
+              {
+
+                  if (it->second)
+                  {
+  
+                  for (unsigned i = 0 ; i < m_pieceNeed[it->first].size(); i ++)
+                  {
+
+                        if (m_requested.find(m_pieceNeed[it->first][i]) == m_requested.end())
+                        {
+
+                          m_requested.insert(m_pieceNeed[it->first][i]);
+
+                          if ((int)m_pieceNeed[it->first][i] == m_numPieces - 1)
+                          {
+                              int lastPieceLength = m_metaInfo.getLength() - m_metaInfo.getPieceLength() * (m_numPieces - 1);
+
+                              sbt::msg::Request rqst(m_pieceNeed[it->first][i], 0,lastPieceLength); //request the missing piece
+                              ConstBufferPtr rqstContent=rqst.encode();
+                              send(it->first, rqstContent->buf(), rqstContent->size(), 0);
+
+                          }
+                          else
+                          {
+                              sbt::msg::Request rqst(m_pieceNeed[it->first][i], 0, m_metaInfo.getPieceLength()); //request the missing piece
+                              ConstBufferPtr rqstContent=rqst.encode();
+                              send(it->first, rqstContent->buf(), rqstContent->size(), 0);
+                          }
+
+                          break;
+
+                        }
+
+
+                    }
+
+                    it->second = false;
+
+                    it ++;
+
+                    if (it != m_unchoke.end())
+                      it->second = true;
+                    else
+                      m_unchoke.begin()->second = true;
+
+                    it--;
+
+                    break;
+
+                  }
+              }   
+          }
       }
 
     }
@@ -1001,9 +1054,14 @@ Client::hasPiece(std::vector<uint8_t> bitfield, int pieceIndex)
 bool
 Client::requestPiece(int pieceIndex) 
 {
-  std::pair<std::set<int>::iterator,bool> ret;
-  ret = m_requested.insert(pieceIndex);
-  return ret.second;
+  if (m_requested.find(pieceIndex) == m_requested.end())
+  {
+    m_requested.insert(pieceIndex);
+    return true;
+  }
+  else
+    return false;
+
 }
  
 void
@@ -1071,14 +1129,23 @@ Client::updateTrackerRequest(int up, int down)
   m_uploaded += up;
   m_downloaded += down;
   m_isComplete = false;
-  if (m_left > 0) {
+  if (m_left > 0) 
+  {
     m_left -= down;
-    if (m_left <= 0) {
+
+    if (m_left <= 0)
+    {
       m_left = 0;
       m_isComplete = true;
     }
+
   }
 }
 
 
 } // namespace sbt
+
+
+
+
+
