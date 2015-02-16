@@ -10,7 +10,7 @@ cp ./tools/text.txt.bak ./tools/text.txt
 
 echo "Run 2 test cases..."
 
-./tools/sbt-tracker 60207 ./tools/test-2.torrent > /dev/null &
+./tools/sbt-tracker 60207 ./tools/test-2.torrent > /dev/null 2>&1 &
 
 sleep 1
 

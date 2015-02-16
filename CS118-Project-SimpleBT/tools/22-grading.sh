@@ -11,7 +11,7 @@ cp ./tools/text.txt.bak ./text.txt
 
 echo "Run 1 test case..."
 
-./tools/sbt-tracker 60207 ./tools/test-2.torrent > /dev/null &
+./tools/sbt-tracker 60207 ./tools/test-2.torrent > /dev/null 2>&1 &
 
 sleep 1
 

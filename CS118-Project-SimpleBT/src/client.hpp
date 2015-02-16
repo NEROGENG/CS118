@@ -72,38 +72,37 @@ private:
   void
   loadMetaInfo(const std::string& torrent);
 
-  bool
-  checkFile(const std::string& filename);
-
-  void
-  checkFileOrCreate();
-
   void
   connectTracker();
 
   void
   sendTrackerRequest();
 
+    bool
+  checkFile(const std::string& filename);
+
   void
-  recvTrackerResponse();
+  checkFileOrCreate();
+
+  TrackerResponse
+  recvTrackerResponse(bool& good_response);
 
   void
   broadcastHaveMsg(int pieceIndex);
 
   bool
-  validatePiece(const std::string& text, const std::string& hash);
-
-  bool
-  hasPiece(std::vector<uint8_t> bitfield, int pieceIndex);
-
-  bool
   requestPiece(int pieceIndex);
 
-  void
+  void 
+  readPieceToBuffer(char* buffer, int pieceIndex, int pieceLength);
+
+  void 
   writePieceToDisk(const char* buffer, int pieceIndex, int pieceLength);
 
-  void
-  readPieceToBuffer(char* buffer, int pieceIndex, int pieceLength);
+  bool 
+  validatePiece(const std::string& text, const std::string& hash);
+ 
+  bool hasPiece(std::vector<uint8_t> bitfield, int pieceIndex);
 
   void
   initializePeerBitfield(std::string peerid, std::vector<uint8_t> bitfield);
@@ -114,8 +113,10 @@ private:
   void
   updateTrackerRequest(int up, int down);
 
-  const std::string 
-  getMyIP();
+  void
+  updateSelfBitfield(int pieceIndex);
+
+  const std::string getMyIP();
 
 private:
   MetaInfo m_metaInfo;
@@ -140,12 +141,19 @@ private:
   std::vector<uint8_t> m_bitfield;
   std::vector<PeerInfo> m_peerlist;
   std::map<std::string, int> m_connectionlist;
+  std::map<int, std::string> m_inverseList;
+  std::vector<std::pair<int, int>> m_fdToPieceNum;
+  std::vector<int> m_listen_list;
   std::map<std::string, std::vector<uint8_t> > m_peerbitfields;
   std::set<int> m_requested;
+  std::map<int, bool> m_unchoke;
+  std::map<int, std::vector<size_t>> m_pieceNeed;
 
-  uint64_t m_uploaded;
-  uint64_t m_downloaded;
-  uint64_t m_left;
+  int m_uploaded;
+  int m_downloaded;
+  int m_left;
+
+  bool good_response;
 
 };
 
