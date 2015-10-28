@@ -35,16 +35,6 @@ main(int argc, char** argv)
 
     // Initialise the client.
     sbt::Client client(argv[1], argv[2]);
-
-
-    while (1)
-    {
-  
-    client.send_http_request_and_receive_from_tracker();
-
-    }
-
-
   }
   catch (std::exception& e)
   {
